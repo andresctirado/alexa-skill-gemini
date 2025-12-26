@@ -33,6 +33,12 @@
       "locales": {
         "en-US": {
           "name": "geminiChat"
+        },
+        "es-ES": {
+          "name": "geminiChat"
+        },
+        "es-MX": {
+          "name": "geminiChat"
         }
       },
       "testingInstructions": "Sample Testing Instructions."

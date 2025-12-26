@@ -39,6 +39,33 @@ data = {
     }]
 }
 
+MESSAGES = {
+    "en": {
+        "launch_prompt": "Hello! Respond in English clearly and do not be verbose. OK?",
+        "welcome": "Hello, I'm your Gemini Chat Bot. {text} How can I help you?",
+        "error": "Request error",
+        "no_response": "I did not receive a response to your request",
+        "reprompt": "Any other questions?",
+        "goodbye": "Goodbye!",
+        "generic_error": "Sorry, I had trouble doing what you asked. Please try again."
+    },
+    "es": {
+        "launch_prompt": "¡Hola! Responde en español claramente y no seas verborrágico. ¿Vale?",
+        "welcome": "Hola, soy tu asistente Gemini. {text} ¿En qué puedo ayudarte?",
+        "error": "Error en la solicitud",
+        "no_response": "No recibí respuesta a tu solicitud",
+        "reprompt": "¿Alguna otra pregunta?",
+        "goodbye": "¡Adiós!",
+        "generic_error": "Lo siento, tuve problemas para hacer lo que pediste. Por favor intenta de nuevo."
+    }
+}
+
+def get_language(handler_input):
+    locale = handler_input.request_envelope.request.locale
+    if locale.startswith("es"):
+        return "es"
+    return "en"
+
 class LaunchRequestHandler(AbstractRequestHandler):
     """Handler for Skill Launch."""
     def can_handle(self, handler_input):
@@ -48,7 +75,20 @@ class LaunchRequestHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
-        data["contents"][0]["parts"][0]["text"] = "Hello! Respond in English clearly and do not be verbose. OK?"
+        lang = get_language(handler_input)
+        msgs = MESSAGES[lang]
+        
+        # Reset conversation history for new session
+        global data
+        data = {
+            "contents": [{
+                "role":"user",
+                "parts": [{
+                    "text": msgs["launch_prompt"]
+                }]
+            }]
+        }
+        
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 200:
             response_data = response.json()
@@ -56,7 +96,7 @@ class LaunchRequestHandler(AbstractRequestHandler):
                 .get("content", {})
                 .get("parts", [{}])[0]
                 .get("text", "Text not found"))
-            speak_output = "Hello, I'm your Gemini Chat Bot. " + text + " How can I help you?"
+            speak_output = msgs["welcome"].format(text=text)
             response_text = {
                 "role": "model",
                 "parts": [{
@@ -65,7 +105,7 @@ class LaunchRequestHandler(AbstractRequestHandler):
             }
             data["contents"].append(response_text)
         else:
-            speak_output = "Request error"
+            speak_output = msgs["error"]
             
         return (
             handler_input.response_builder
@@ -83,6 +123,9 @@ class ChatIntentHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
+        lang = get_language(handler_input)
+        msgs = MESSAGES[lang]
+        
         query = handler_input.request_envelope.request.intent.slots["query"].value
         query_text = {
                 "role": "user",
@@ -107,12 +150,12 @@ class ChatIntentHandler(AbstractRequestHandler):
             }
             data["contents"].append(response_text)
         else:
-            speak_output = "I did not receive a response to your request"
+            speak_output = msgs["no_response"]
 
         return (
             handler_input.response_builder
                 .speak(speak_output)
-                .ask("Any other questions?")
+                .ask(msgs["reprompt"])
                 .response
         )
 
@@ -126,7 +169,9 @@ class CancelOrStopIntentHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
-        speak_output = "Goodbye!"
+        lang = get_language(handler_input)
+        msgs = MESSAGES[lang]
+        speak_output = msgs["goodbye"]
 
         return (
             handler_input.response_builder
@@ -147,8 +192,15 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
     def handle(self, handler_input, exception):
         # type: (HandlerInput, Exception) -> Response
         logger.error(exception, exc_info=True)
+        
+        # Check if we can determine language, default to en
+        try:
+            lang = get_language(handler_input)
+        except:
+            lang = "en"
+        msgs = MESSAGES[lang]
 
-        speak_output = "Sorry, I had trouble doing what you asked. Please try again."
+        speak_output = msgs["generic_error"]
 
         return (
             handler_input.response_builder
