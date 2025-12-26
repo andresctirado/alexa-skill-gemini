@@ -39,6 +39,9 @@
         },
         "es-MX": {
           "name": "geminiChat"
+        },
+        "es-US": {
+          "name": "geminiChat"
         }
       },
       "testingInstructions": "Sample Testing Instructions."
